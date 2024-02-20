@@ -266,18 +266,24 @@ Serial.print(distanceInInches, 5); // Print the distance in inches up to 2 decim
   double distanceInInches;
   double threshold = 0.0000;
   double overshoot = 0.05;
- 
+
+
   
 while(1){
+    int cur_speed = 2000;
+    int terminal_speed = 8000;
   int left_switch_value = digitalRead(left_switchPin); //away from motor
   int right_switch_value = digitalRead(right_switchPin);// towards motor
-// EthernetClient client = server.available();
-// if (client) {
-//    return;
-// }
+
+
   while(left_switch_value != 0){
       left_switch_value = digitalRead(left_switchPin);
       delay(100);
+        EthernetClient client = server.available();
+       if (client) {
+        Serial.println("Returning");
+        return;
+    }
   } //wait until left switch pressed
 
   Serial.print("Left Switch Value: ");
@@ -293,7 +299,7 @@ while(1){
      //noTone(PUL_PIN);
      digitalWrite(DIR_PIN, LOW); // away from motor
      delay(100);
-     tone(PUL_PIN, 2000);//change this to make it go faster
+     tone(PUL_PIN,cur_speed);//change this to make it go faster
     while(distanceInInches < (starting_measurement + overshoot)){
 
       
@@ -302,6 +308,11 @@ while(1){
       inputVolts = 5 * ((float)inputCounts / 65535);  //Convert 13-bit value to Volts
       distanceInInches = inputCounts*19.875/65535.0 +0.1;//manual 0.1 inch offset 
       Serial.println(distanceInInches, 5); // Print the distance in inches up to 2 decimal places
+      cur_speed += 1;
+      if (cur_speed > terminal_speed){
+        cur_speed = terminal_speed;
+      }
+      tone(PUL_PIN,cur_speed);//change this to make it go faster
     }
 
      noTone(PUL_PIN);
@@ -320,8 +331,13 @@ while(1){
   while(right_switch_value != 0){
       right_switch_value = digitalRead(right_switchPin);
       delay(100);
+      EthernetClient client = server.available();
+       if (client) {
+    return;
+ }
   } //wait until left switch pressed
-  
+
+  cur_speed = 2000;
   digitalWrite(DIR_PIN, HIGH); // towards motor
   delay(100);
      tone(PUL_PIN, 2000);//change this to make it go faster
@@ -331,6 +347,11 @@ while(1){
       inputVolts = 5 * ((float)inputCounts / 65535);  //Convert 13-bit value to Volts
       distanceInInches = inputCounts*19.875/65535.0 +0.1;//manual 0.1 inch offset 
       Serial.println(distanceInInches, 5); // Print the distance in inches up to 2 decimal places
+      cur_speed += 1;
+      if (cur_speed > terminal_speed){
+        cur_speed = terminal_speed;
+      }
+      tone(PUL_PIN,cur_speed);//change this to make it go faster
     }
     noTone(PUL_PIN);
 
