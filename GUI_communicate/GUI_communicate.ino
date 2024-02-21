@@ -21,7 +21,7 @@ const int maxSubstringLength = 20; // Maximum length of each substring
 // Define the pin numbers for the switches
 const int left_switchPin = 2; 
 const int right_switchPin = 3;
-int terminal_speed = 10000;
+int terminal_speed = 3000;
 int starting_speed = 1000;
 #define PUL_PIN 0    // Define the PUL pin
 #define DIR_PIN 1    // Define the DIR pin
@@ -209,7 +209,7 @@ while(1){
   int cur_speed = starting_speed;
 
   while (left_switchValue == LOW) {
-    digitalWrite(DIR_PIN, HIGH); // away? motor
+    digitalWrite(DIR_PIN, LOW); // away motor
 
     while ((cur_speed < terminal_speed) &&(left_switchValue == LOW)) {
       cur_speed += 200;
@@ -228,7 +228,7 @@ while(1){
   }
 
   while (right_switchValue == LOW) {
-    digitalWrite(DIR_PIN, LOW); // towards motor
+    digitalWrite(DIR_PIN, HIGH); // towards motor
 
     while ((cur_speed < terminal_speed) &&(right_switchValue == LOW)) {
     cur_speed += 200;
@@ -271,7 +271,7 @@ Serial.print(distanceInInches, 5); // Print the distance in inches up to 2 decim
   
 while(1){
     int cur_speed = 2000;
-    int terminal_speed = 8000;
+    int terminal_speed = 4000;
   int left_switch_value = digitalRead(left_switchPin); //away from motor
   int right_switch_value = digitalRead(right_switchPin);// towards motor
 
