@@ -21,7 +21,7 @@ const int maxSubstringLength = 20; // Maximum length of each substring
 // Define the pin numbers for the switches
 const int left_switchPin = 2; 
 const int right_switchPin = 3;
-int terminal_speed = 3000;
+int terminal_speed = 6000;
 int starting_speed = 1000;
 #define PUL_PIN 0    // Define the PUL pin
 #define DIR_PIN 1    // Define the DIR pin
@@ -137,9 +137,10 @@ void loop() {
                 Serial.println("Calling routine to stretch part");
                 double starting_measurement = substrings[3].toDouble();
                 double ending_measurement = substrings[6].toDouble();
+                double stretching_speed = substrings[8].toDouble();
                 client.stop();
                 Serial.println("Client disconnected");
-                StretchSeal(starting_measurement, ending_measurement);
+                StretchSeal(starting_measurement, ending_measurement, stretching_speed);
               }
              
            delay(500);
@@ -258,7 +259,7 @@ Serial.print(distanceInInches, 5); // Print the distance in inches up to 2 decim
     } 
 
 
- void StretchSeal(double starting_measurement, double ending_measurement){
+ void StretchSeal(double starting_measurement, double ending_measurement, double stretching_speed){
   float inches = 0;
   int inputCounts;
   float sensorValue;
@@ -267,11 +268,13 @@ Serial.print(distanceInInches, 5); // Print the distance in inches up to 2 decim
   double threshold = 0.0000;
   double overshoot = 0.05;
 
+  int stretch_terminal_speed = 1300*stretching_speed; //eq. found by taking data points and finding linear line of best fit
+  int return_terminal_speed = 8000;
 
   
 while(1){
     int cur_speed = 2000;
-    int terminal_speed = 4000;
+
   int left_switch_value = digitalRead(left_switchPin); //away from motor
   int right_switch_value = digitalRead(right_switchPin);// towards motor
 
@@ -279,7 +282,7 @@ while(1){
   while(left_switch_value != 0){
       left_switch_value = digitalRead(left_switchPin);
       delay(100);
-        EthernetClient client = server.available();
+       EthernetClient client = server.available();
        if (client) {
         Serial.println("Returning");
         return;
@@ -309,8 +312,8 @@ while(1){
       distanceInInches = inputCounts*19.875/65535.0 +0.1;//manual 0.1 inch offset 
       Serial.println(distanceInInches, 5); // Print the distance in inches up to 2 decimal places
       cur_speed += 1;
-      if (cur_speed > terminal_speed){
-        cur_speed = terminal_speed;
+      if (cur_speed > return_terminal_speed){
+        cur_speed = return_terminal_speed;
       }
       tone(PUL_PIN,cur_speed);//change this to make it go faster
     }
@@ -318,13 +321,21 @@ while(1){
      noTone(PUL_PIN);
      digitalWrite(DIR_PIN, HIGH); // towards motor
      delay(100);
-     tone(PUL_PIN, 2000);//change this to make it go faster
+     cur_speed =2000;
+    
+    
+     
     while(distanceInInches > (starting_measurement)){
       //delay(1);
       inputCounts = P1.readAnalog(1, 1); //Reads analog data from slot 1 channel 2 of the analog input module
       inputVolts = 5 * ((float)inputCounts / 65535);  //Convert 13-bit value to Volts
       distanceInInches = inputCounts*19.875/65535.0 +0.1;//manual 0.1 inch offset 
       Serial.println(distanceInInches, 5); // Print the distance in inches up to 2 decimal places
+      cur_speed += 1;
+       if (cur_speed > return_terminal_speed){
+        cur_speed = return_terminal_speed;
+      }
+       tone(PUL_PIN, cur_speed);//change this to make it go 
     }
     noTone(PUL_PIN);
 
@@ -348,8 +359,8 @@ while(1){
       distanceInInches = inputCounts*19.875/65535.0 +0.1;//manual 0.1 inch offset 
       Serial.println(distanceInInches, 5); // Print the distance in inches up to 2 decimal places
       cur_speed += 1;
-      if (cur_speed > terminal_speed){
-        cur_speed = terminal_speed;
+      if (cur_speed > stretch_terminal_speed){
+        cur_speed = stretch_terminal_speed;
       }
       tone(PUL_PIN,cur_speed);//change this to make it go faster
     }
