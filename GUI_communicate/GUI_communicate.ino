@@ -64,7 +64,7 @@ EthernetServer server(port);
 
 void setup() {
 
- while(!Serial); 
+// while(!Serial); 
 while(!P1.init()); //Wait for module sign-on
 Ethernet.init(5); //CS pin for P1AM-ETH
 
@@ -292,7 +292,7 @@ while(1){
   Serial.print("Left Switch Value: ");
   Serial.println(left_switch_value, 2);
  
-    Serial.println("going to starting position");
+   Serial.println("going to starting position");
 
     inputCounts = P1.readAnalog(1, 1); //Reads analog data from slot 1 channel 2 of the analog input module
     inputVolts = 5 * ((float)inputCounts / 65535);  //Convert 13-bit value to Volts
