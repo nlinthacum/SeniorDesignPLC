@@ -61,6 +61,7 @@ IPAddress ip(192, 168, 1, 177); //IP Address our webpage will be at
 int port = 80; // Change this to your desired port number
 EthernetServer server(port);
 // Create an Ethernet server
+unsigned long connectionTime = millis(); //used for heartbeat timeout
 
 void setup() {
 
@@ -100,12 +101,22 @@ void loop() {
   // Wait for a client to connect
   EthernetClient client = server.available();
 
+// if (millis() - connectionTime > 5000) { // Adjust the timeout as needed
+//           Serial.println("Client disconnected (timeout)");
+//           Serial.println("Millis:" + String(millis()));
+//           Serial.println("Connection Time: " + String(connectionTime));
+//           client.stop();
+//           delay(1000);
+//       }
   if (client) {
     Serial.println("Client connected");
+    
 
     // Read data from the client
     String receivedData = "";
     while (client.connected()) {
+
+  
       if (client.available()) {
         char c = client.read();
 
@@ -142,6 +153,10 @@ void loop() {
 //                Serial.println("Client disconnected");
                 StretchSeal(starting_measurement, ending_measurement, stretching_speed, client);
               }
+
+              if (substrings[0] == "heartbeat"){
+                connectionTime = millis();
+              }
              
            delay(500);
            break;
@@ -154,7 +169,9 @@ void loop() {
      
         
       }
+
     }
+
 
     // Close the connection (Commenting this out seems to keep the connection open and doesn't seem to cause issues...)
 //   client.stop();
@@ -167,50 +184,43 @@ void loop() {
 
 void SetStartingDistance(EthernetClient client)
 {
-   Serial.println("In routine to do new part");
 double starting_distance = -1;
 float inches = 0;
 int inputCounts;
 float sensorValue;
 float inputVolts;
 double distanceInInches;
+ String receivedData = "";
 while(1){
-// EthernetClient client = server.available();
- if (client) {
-//    Serial.println("Client connected");
-     // Read data from the client
-    String receivedData = "";
-//    while (client.connected()) {
+   Serial.println("In routine to do new part");
+
+
+
       if (client.available()) {
         char c = client.read();
-        Serial.println("Received: " + c);
-      //end when new line is sent
-      if (c == '\n') {  
-        starting_distance = distanceInInches;
-        String str = String(starting_distance, 6);
-        char msg[10];
-        str.toCharArray(msg, 9);
-        client.write(msg);
-        delay(500);
-        return;
-      }
-      }
+        //end when new line is sent
+        if (c == '\n') {
+           Serial.println("Received data: " + receivedData);
+           if (receivedData == "BREAK"){
+            return;
+           }
+           else if (receivedData == "saved_starting"){
+            starting_distance = distanceInInches;
+            String str = String(starting_distance, 6);
+            char msg[10];
+            str.toCharArray(msg, 9);
+            client.write(msg);
+            delay(500);
+            return;
+           }
 
- }
- else {
-   Serial.println("Returning from else");
-        return;
- }
- if (client.available()) {
-        Serial.println("Returning from available");
-        starting_distance = distanceInInches;
-        String str = String(starting_distance, 6);
-        char msg[10];
-        str.toCharArray(msg, 9);
-        client.write(msg);
-        delay(500);
-        return;
-       }
+           receivedData = "";
+      }
+      else{
+        receivedData += c;
+      }
+     }
+
 
     
      // Read the values of the switches
@@ -281,26 +291,38 @@ while(1){
   int stretch_terminal_speed = 1300*stretching_speed; //eq. found by taking data points and finding linear line of best fit
   int return_terminal_speed = 6000;
 
-  
+  String receivedData = "";
 while(1){
-    int cur_speed = 2000;
+   int cur_speed = 2000;
 
   int left_switch_value = digitalRead(left_switchPin); //away from motor
   int right_switch_value = digitalRead(right_switchPin);// towards motor
 
 
   while(left_switch_value != 0){
+    Serial.println("Waiting for left switch");
       left_switch_value = digitalRead(left_switchPin);
       delay(100);
-//       EthernetClient client = server.available();
-       if (client.available()) {
-        Serial.println("Returning");
-        return;
-       }
-       if (!client) {
-        Serial.println("Returning");
-        return;
-    }
+
+      if (client.available()) {
+        char c = client.read();
+        //end when new line is sent
+        if (c == '\n') {
+           Serial.println("Received data: " + receivedData);
+           if (receivedData == "BREAK"){
+            return;
+           }
+           receivedData = "";
+      }
+      else{
+        receivedData += c;
+      }
+     }
+
+
+
+
+      
   } //wait until left switch pressed
 
 //  Serial.print("Left Switch Value: ");
@@ -364,20 +386,29 @@ while(1){
     char msg[10];
     str.toCharArray(msg, 9);
     client.write(msg);
+    
     delay(500);
-//    client.stop();
 
   while(right_switch_value != 0){
+       Serial.println("Waiting for right switch");
       right_switch_value = digitalRead(right_switchPin);
       delay(100);
-//      EthernetClient client = server.available();
-       if (client.available()) {
-        Serial.println("Returning");
-        return;
-       }
-       if (!client) {
-    return;
- }
+      
+      if (client.available()) {
+        char c = client.read();
+        //end when new line is sent
+        if (c == '\n') {
+           Serial.println("Received data: " + receivedData);
+           if (receivedData == "BREAK"){
+            return;
+           }
+           receivedData = "";
+      }
+      else{
+        receivedData += c;
+      }
+     }
+       
   } //wait until left switch pressed
 
   cur_speed = 2000;
