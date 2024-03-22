@@ -23,6 +23,7 @@ const int left_switchPin = 2;
 const int right_switchPin = 3;
 int terminal_speed = 6000;
 int starting_speed = 1000;
+const unsigned long heartbeatInterval = 10000; // 10 seconds
 #define PUL_PIN 0    // Define the PUL pin
 #define DIR_PIN 1    // Define the DIR pin
 
@@ -190,13 +191,14 @@ int inputCounts;
 float sensorValue;
 float inputVolts;
 double distanceInInches;
- String receivedData = "";
+String receivedData = "";
+unsigned long lastHeartbeatTime = millis();
+
 while(1){
    Serial.println("In routine to do new part");
 
-
-
-      if (client.available()) {
+   
+    if (client.available()) {
         char c = client.read();
         //end when new line is sent
         if (c == '\n') {
@@ -204,16 +206,9 @@ while(1){
            if (receivedData == "BREAK"){
             return;
            }
-           else if (receivedData == "saved_starting"){
-            starting_distance = distanceInInches;
-            String str = String(starting_distance, 6);
-            char msg[10];
-            str.toCharArray(msg, 9);
-            client.write(msg);
-            delay(500);
-            return;
+           if (receivedData == "heartbeat"){
+              lastHeartbeatTime = millis();
            }
-
            receivedData = "";
       }
       else{
@@ -221,7 +216,11 @@ while(1){
       }
      }
 
-
+     if (millis() - lastHeartbeatTime > heartbeatInterval) {
+        // More than 5 seconds since last heartbeat, return
+        Serial.println("Timeout waiting in setup new part");
+        return;
+    }
     
      // Read the values of the switches
   int left_switchValue = digitalRead(left_switchPin);
@@ -246,6 +245,7 @@ while(1){
       noTone(PUL_PIN);
       break;
     }
+    lastHeartbeatTime = millis(); //reset heartbeat time since none sent during movement
   }
 
   while (right_switchValue == LOW) {
@@ -265,7 +265,7 @@ while(1){
       noTone(PUL_PIN);
       break;
     }
-    
+    lastHeartbeatTime = millis(); //reset heartbeat time since none sent during movement
   }
  inputCounts = P1.readAnalog(1, 1); //Reads analog data from slot 1 channel 2 of the analog input module
  inputVolts = 5 * ((float)inputCounts / 65535);  //Convert 13-bit value to Volts
@@ -290,6 +290,7 @@ while(1){
 
   int stretch_terminal_speed = 1300*stretching_speed; //eq. found by taking data points and finding linear line of best fit
   int return_terminal_speed = 6000;
+  unsigned long lastHeartbeatTime = millis();
 
   String receivedData = "";
 while(1){
@@ -298,7 +299,7 @@ while(1){
   int left_switch_value = digitalRead(left_switchPin); //away from motor
   int right_switch_value = digitalRead(right_switchPin);// towards motor
 
-
+  lastHeartbeatTime = millis(); //reset heartbeat time since none sent during movement
   while(left_switch_value != 0){
     Serial.println("Waiting for left switch");
       left_switch_value = digitalRead(left_switchPin);
@@ -312,6 +313,9 @@ while(1){
            if (receivedData == "BREAK"){
             return;
            }
+           if (receivedData == "heartbeat"){
+              lastHeartbeatTime = millis();
+           }
            receivedData = "";
       }
       else{
@@ -319,8 +323,11 @@ while(1){
       }
      }
 
-
-
+     if (millis() - lastHeartbeatTime > heartbeatInterval) {
+        // More than 5 seconds since last heartbeat, return
+        Serial.println("Timeout waiting for left switch");
+        return;
+    }
 
       
   } //wait until left switch pressed
@@ -389,12 +396,13 @@ while(1){
     
     delay(500);
 
+lastHeartbeatTime = millis(); //reset heartbeat time since none sent during movement
   while(right_switch_value != 0){
        Serial.println("Waiting for right switch");
       right_switch_value = digitalRead(right_switchPin);
       delay(100);
       
-      if (client.available()) {
+ if (client.available()) {
         char c = client.read();
         //end when new line is sent
         if (c == '\n') {
@@ -402,14 +410,23 @@ while(1){
            if (receivedData == "BREAK"){
             return;
            }
+           if (receivedData == "heartbeat"){
+              lastHeartbeatTime = millis();
+           }
            receivedData = "";
       }
       else{
         receivedData += c;
       }
      }
+
+     if (millis() - lastHeartbeatTime > heartbeatInterval) {
+        // More than 5 seconds since last heartbeat, return
+        Serial.println("Timeout waiting for right switch");
+        return;
+    }
        
-  } //wait until left switch pressed
+  } //wait until right switch pressed
 
   cur_speed = 2000;
   digitalWrite(DIR_PIN, HIGH); // towards motor
