@@ -209,6 +209,19 @@ while(1){
            if (receivedData == "heartbeat"){
               lastHeartbeatTime = millis();
            }
+            if (receivedData == "saved_starting"){
+                inputCounts = P1.readAnalog(1, 1); //Reading 1 more time
+                distanceInInches = inputCounts*19.875/65535.0 +0.1;
+                Serial.println("Sending starting position");
+                String str = String(distanceInInches, 6);
+                char msg[10];
+                str.toCharArray(msg, 9);
+                client.write(msg);
+                delay(500);
+                return;
+           }
+
+           
            receivedData = "";
       }
       else{
@@ -231,7 +244,7 @@ while(1){
   while (left_switchValue == LOW) {
     digitalWrite(DIR_PIN, LOW); // away motor
 
-    while ((cur_speed < terminal_speed) &&(left_switchValue == LOW)) {
+    while ((cur_speed < terminal_speed) && (left_switchValue == LOW)) {
       cur_speed += 200;
       tone(PUL_PIN, cur_speed);
       delay(100);
@@ -388,13 +401,12 @@ while(1){
   distanceInInches = inputCounts*19.875/65535.0 +0.1;
   Serial.println("Sending starting position");
 
-
-    String str = String(distanceInInches, 6);
-    char msg[10];
-    str.toCharArray(msg, 9);
-    client.write(msg);
-    
-    delay(500);
+   String str1 = String(distanceInInches, 6);
+   String str2 = "LOG: START: " + str1;
+   char msg[22];
+   str2.toCharArray(msg, 21);
+   client.write(msg);
+   delay(500);
 
 lastHeartbeatTime = millis(); //reset heartbeat time since none sent during movement
   while(right_switch_value != 0){
@@ -445,6 +457,19 @@ lastHeartbeatTime = millis(); //reset heartbeat time since none sent during move
       tone(PUL_PIN,cur_speed);//change this to make it go faster
     }
     noTone(PUL_PIN);
+
+  delay(500);
+  inputCounts = P1.readAnalog(1, 1); //Reading 1 more time
+  inputVolts = 5 * ((float)inputCounts / 65535); 
+  distanceInInches = inputCounts*19.875/65535.0 +0.1;
+  Serial.println("Sending ending position");
+
+   String str3 = String(distanceInInches, 6);
+   String str4 = "LOG: END: " + str3;
+   char msg4[22];
+   str4.toCharArray(msg4, 21);
+   client.write(msg4);
+   delay(500);
 
   
  }
