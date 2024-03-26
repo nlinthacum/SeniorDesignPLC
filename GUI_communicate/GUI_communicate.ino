@@ -8,8 +8,8 @@
 #include <Arduino.h>
 
 
-void SetStartingDistance(void);
-void StretchSeal(double starting_measurement, double ending_measurement);
+void SetStartingDistance(EthernetClient client);
+void StretchSeal(double starting_measurement, double ending_measurement, EthernetClient client);
 
 const float mmToInches = 0.0393701; // Conversion factor
 const char P1_04AD_CONFIG[] = { 0x40, 0x00, 0x00, 0x00, 0x20, 0x02, 0x00, 0x00, 0x21, 0x03, 0x00, 0x00, 0x22, 0x03, 0x00, 0x00, 0x23, 0x03 };
@@ -23,6 +23,7 @@ const int left_switchPin = 2;
 const int right_switchPin = 3;
 int terminal_speed = 6000;
 int starting_speed = 1000;
+const unsigned long heartbeatInterval = 10000; // 10 seconds
 #define PUL_PIN 0    // Define the PUL pin
 #define DIR_PIN 1    // Define the DIR pin
 
@@ -61,6 +62,7 @@ IPAddress ip(192, 168, 1, 177); //IP Address our webpage will be at
 int port = 80; // Change this to your desired port number
 EthernetServer server(port);
 // Create an Ethernet server
+unsigned long connectionTime = millis(); //used for heartbeat timeout
 
 void setup() {
 
@@ -100,12 +102,22 @@ void loop() {
   // Wait for a client to connect
   EthernetClient client = server.available();
 
+// if (millis() - connectionTime > 5000) { // Adjust the timeout as needed
+//           Serial.println("Client disconnected (timeout)");
+//           Serial.println("Millis:" + String(millis()));
+//           Serial.println("Connection Time: " + String(connectionTime));
+//           client.stop();
+//           delay(1000);
+//       }
   if (client) {
     Serial.println("Client connected");
+    
 
     // Read data from the client
     String receivedData = "";
     while (client.connected()) {
+
+  
       if (client.available()) {
         char c = client.read();
 
@@ -129,18 +141,22 @@ void loop() {
              
 
              if (substrings[0] == "setup_new_part"){
-                client.stop();//close and then reopen in SetStartingDistance function for scope
+//                client.stop();//close and then reopen in SetStartingDistance function for scope
                 Serial.println("Calling routine to do new part");
-                SetStartingDistance();
+                SetStartingDistance(client);
               }
               else if (substrings[0] == "Seal_Data"){
                 Serial.println("Calling routine to stretch part");
                 double starting_measurement = substrings[3].toDouble();
                 double ending_measurement = substrings[6].toDouble();
                 double stretching_speed = substrings[8].toDouble();
-                client.stop();
-                Serial.println("Client disconnected");
-                StretchSeal(starting_measurement, ending_measurement, stretching_speed);
+//                client.stop();
+//                Serial.println("Client disconnected");
+                StretchSeal(starting_measurement, ending_measurement, stretching_speed, client);
+              }
+
+              if (substrings[0] == "heartbeat"){
+                connectionTime = millis();
               }
              
            delay(500);
@@ -154,54 +170,70 @@ void loop() {
      
         
       }
+
     }
 
+
     // Close the connection (Commenting this out seems to keep the connection open and doesn't seem to cause issues...)
-   client.stop();
-   Serial.println("Client disconnected");
+//   client.stop();
+//   Serial.println("Client disconnected");
   }
 }
 
 
 
 
-void SetStartingDistance(void)
+void SetStartingDistance(EthernetClient client)
 {
-   Serial.println("In routine to do new part");
 double starting_distance = -1;
 float inches = 0;
 int inputCounts;
 float sensorValue;
 float inputVolts;
 double distanceInInches;
+String receivedData = "";
+unsigned long lastHeartbeatTime = millis();
+
 while(1){
- EthernetClient client = server.available();
+   Serial.println("In routine to do new part");
 
- if (client) {
-    Serial.println("Client connected");
-     // Read data from the client
-    String receivedData = "";
-    while (client.connected()) {
-      if (client.available()) {
+   
+    if (client.available()) {
         char c = client.read();
+        //end when new line is sent
+        if (c == '\n') {
+           Serial.println("Received data: " + receivedData);
+           if (receivedData == "BREAK"){
+            return;
+           }
+           if (receivedData == "heartbeat"){
+              lastHeartbeatTime = millis();
+           }
+            if (receivedData == "saved_starting"){
+                inputCounts = P1.readAnalog(1, 1); //Reading 1 more time
+                distanceInInches = inputCounts*19.875/65535.0 +0.1;
+                Serial.println("Sending starting position");
+                String str = String(distanceInInches, 6);
+                char msg[10];
+                str.toCharArray(msg, 9);
+                client.write(msg);
+                delay(500);
+                return;
+           }
 
-      //end when new line is sent
-      if (c == '\n') {  
-        starting_distance = distanceInInches;
-        String str = String(starting_distance, 6);
-        char msg[10];
-        str.toCharArray(msg, 9);
-        client.write(msg);
-        delay(500);
-        client.stop();
+           
+           receivedData = "";
+      }
+      else{
+        receivedData += c;
+      }
+     }
+
+     if (millis() - lastHeartbeatTime > heartbeatInterval) {
+        // More than 5 seconds since last heartbeat, return
+        Serial.println("Timeout waiting in setup new part");
         return;
-      }
-      }
     }
- }
-
-
-
     
      // Read the values of the switches
   int left_switchValue = digitalRead(left_switchPin);
@@ -212,7 +244,7 @@ while(1){
   while (left_switchValue == LOW) {
     digitalWrite(DIR_PIN, LOW); // away motor
 
-    while ((cur_speed < terminal_speed) &&(left_switchValue == LOW)) {
+    while ((cur_speed < terminal_speed) && (left_switchValue == LOW)) {
       cur_speed += 200;
       tone(PUL_PIN, cur_speed);
       delay(100);
@@ -226,6 +258,7 @@ while(1){
       noTone(PUL_PIN);
       break;
     }
+    lastHeartbeatTime = millis(); //reset heartbeat time since none sent during movement
   }
 
   while (right_switchValue == LOW) {
@@ -245,21 +278,21 @@ while(1){
       noTone(PUL_PIN);
       break;
     }
-    
+    lastHeartbeatTime = millis(); //reset heartbeat time since none sent during movement
   }
  inputCounts = P1.readAnalog(1, 1); //Reads analog data from slot 1 channel 2 of the analog input module
  inputVolts = 5 * ((float)inputCounts / 65535);  //Convert 13-bit value to Volts
  distanceInInches = inputCounts*19.875/65535.0 +0.1;//manual 0.1 inch offset 
-Serial.print(distanceInInches, 5); // Print the distance in inches up to 2 decimal places
-  Serial.println(" inches");
+ Serial.print(distanceInInches, 5); // Print the distance in inches up to 2 decimal places
+ Serial.println(" inches");
 
  delay(100);
    }
 
-    } 
+ } 
 
 
- void StretchSeal(double starting_measurement, double ending_measurement, double stretching_speed){
+ void StretchSeal(double starting_measurement, double ending_measurement, double stretching_speed, EthernetClient client){
   float inches = 0;
   int inputCounts;
   float sensorValue;
@@ -269,28 +302,53 @@ Serial.print(distanceInInches, 5); // Print the distance in inches up to 2 decim
   double overshoot = 0.05;
 
   int stretch_terminal_speed = 1300*stretching_speed; //eq. found by taking data points and finding linear line of best fit
-  int return_terminal_speed = 8000;
+  int return_terminal_speed = 6000;
+  unsigned long lastHeartbeatTime = millis();
+  unsigned long stretch_start_time= 0;
+  unsigned long stretch_end_time=0;
 
-  
+  String receivedData = "";
 while(1){
-    int cur_speed = 2000;
+   int cur_speed = 2000;
 
   int left_switch_value = digitalRead(left_switchPin); //away from motor
   int right_switch_value = digitalRead(right_switchPin);// towards motor
 
-
+  lastHeartbeatTime = millis(); //reset heartbeat time since none sent during movement
   while(left_switch_value != 0){
+    Serial.println("Waiting for left switch");
       left_switch_value = digitalRead(left_switchPin);
       delay(100);
-       EthernetClient client = server.available();
-       if (client) {
-        Serial.println("Returning");
+
+      if (client.available()) {
+        char c = client.read();
+        //end when new line is sent
+        if (c == '\n') {
+           Serial.println("Received data: " + receivedData);
+           if (receivedData == "BREAK"){
+            return;
+           }
+           if (receivedData == "heartbeat"){
+              lastHeartbeatTime = millis();
+           }
+           receivedData = "";
+      }
+      else{
+        receivedData += c;
+      }
+     }
+
+     if (millis() - lastHeartbeatTime > heartbeatInterval) {
+        // More than 5 seconds since last heartbeat, return
+        Serial.println("Timeout waiting for left switch");
         return;
     }
+
+      
   } //wait until left switch pressed
 
-  Serial.print("Left Switch Value: ");
-  Serial.println(left_switch_value, 2);
+//  Serial.print("Left Switch Value: ");
+//  Serial.println(left_switch_value, 2);
  
    Serial.println("going to starting position");
 
@@ -339,15 +397,54 @@ while(1){
     }
     noTone(PUL_PIN);
 
+  //now we are at the starting position
+  inputCounts = P1.readAnalog(1, 1); //Reading 1 more time
+  inputVolts = 5 * ((float)inputCounts / 65535); 
+  distanceInInches = inputCounts*19.875/65535.0 +0.1;
+  Serial.println("Sending starting position");
+
+   String str1 = String(distanceInInches, 6);
+   String str2 = "LOG:START: " + str1;
+   char msg[22];
+   str2.toCharArray(msg, 21);
+   client.write(msg);
+   delay(500);
+
+lastHeartbeatTime = millis(); //reset heartbeat time since none sent during movement
   while(right_switch_value != 0){
+       Serial.println("Waiting for right switch");
       right_switch_value = digitalRead(right_switchPin);
       delay(100);
-      EthernetClient client = server.available();
-       if (client) {
-    return;
- }
-  } //wait until left switch pressed
+      
+ if (client.available()) {
+        char c = client.read();
+        //end when new line is sent
+        if (c == '\n') {
+           Serial.println("Received data: " + receivedData);
+           if (receivedData == "BREAK"){
+            return;
+           }
+           if (receivedData == "heartbeat"){
+              lastHeartbeatTime = millis();
+           }
+           receivedData = "";
+      }
+      else{
+        receivedData += c;
+      }
+     }
 
+     if (millis() - lastHeartbeatTime > heartbeatInterval) {
+        // More than 5 seconds since last heartbeat, return
+        Serial.println("Timeout waiting for right switch");
+        return;
+    }
+       
+  } //wait until right switch pressed
+
+ 
+  stretch_start_time = millis();
+  
   cur_speed = 2000;
   digitalWrite(DIR_PIN, HIGH); // towards motor
   delay(100);
@@ -365,6 +462,27 @@ while(1){
       tone(PUL_PIN,cur_speed);//change this to make it go faster
     }
     noTone(PUL_PIN);
+
+  stretch_end_time = millis();
+
+  long stretch_time_duration = stretch_end_time - stretch_start_time;
+  double stretch_time_seconds = stretch_time_duration / 1000.0; // Convert milliseconds to seconds
+  Serial.print("Stretch time duration: ");
+  Serial.println(stretch_time_seconds);
+
+  delay(500);
+  inputCounts = P1.readAnalog(1, 1); //Reading 1 more time
+  inputVolts = 5 * ((float)inputCounts / 65535); 
+  distanceInInches = inputCounts*19.875/65535.0 +0.1;
+  Serial.println("Sending ending position");
+
+   String dst = String(distanceInInches, 6);
+   String time_str = String(stretch_time_seconds,6);
+   String str4 = "LOG:END: " + dst + ":" + time_str;
+   char msg4[28];
+   str4.toCharArray(msg4, 27);
+   client.write(msg4);
+   delay(500);
 
   
  }
