@@ -304,6 +304,8 @@ while(1){
   int stretch_terminal_speed = 1300*stretching_speed; //eq. found by taking data points and finding linear line of best fit
   int return_terminal_speed = 6000;
   unsigned long lastHeartbeatTime = millis();
+  unsigned long stretch_start_time= 0;
+  unsigned long stretch_end_time=0;
 
   String receivedData = "";
 while(1){
@@ -402,7 +404,7 @@ while(1){
   Serial.println("Sending starting position");
 
    String str1 = String(distanceInInches, 6);
-   String str2 = "LOG: START: " + str1;
+   String str2 = "LOG:START: " + str1;
    char msg[22];
    str2.toCharArray(msg, 21);
    client.write(msg);
@@ -440,6 +442,9 @@ lastHeartbeatTime = millis(); //reset heartbeat time since none sent during move
        
   } //wait until right switch pressed
 
+ 
+  stretch_start_time = millis();
+  
   cur_speed = 2000;
   digitalWrite(DIR_PIN, HIGH); // towards motor
   delay(100);
@@ -458,16 +463,24 @@ lastHeartbeatTime = millis(); //reset heartbeat time since none sent during move
     }
     noTone(PUL_PIN);
 
+  stretch_end_time = millis();
+
+  long stretch_time_duration = stretch_end_time - stretch_start_time;
+  double stretch_time_seconds = stretch_time_duration / 1000.0; // Convert milliseconds to seconds
+  Serial.print("Stretch time duration: ");
+  Serial.println(stretch_time_seconds);
+
   delay(500);
   inputCounts = P1.readAnalog(1, 1); //Reading 1 more time
   inputVolts = 5 * ((float)inputCounts / 65535); 
   distanceInInches = inputCounts*19.875/65535.0 +0.1;
   Serial.println("Sending ending position");
 
-   String str3 = String(distanceInInches, 6);
-   String str4 = "LOG: END: " + str3;
-   char msg4[22];
-   str4.toCharArray(msg4, 21);
+   String dst = String(distanceInInches, 6);
+   String time_str = String(stretch_time_seconds,6);
+   String str4 = "LOG:END: " + dst + ":" + time_str;
+   char msg4[28];
+   str4.toCharArray(msg4, 27);
    client.write(msg4);
    delay(500);
 
