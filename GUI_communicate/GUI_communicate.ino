@@ -3,7 +3,7 @@
 #include <Ethernet.h>
 #include <P1AM.h>
 #include <Servo.h> 
-#include <cstring>
+//#include <cstring>
 #include <string.h> 
 #include <Arduino.h>
 
