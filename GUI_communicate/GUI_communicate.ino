@@ -303,6 +303,10 @@ while(1){
 
   int stretch_terminal_speed = 1300*stretching_speed; //eq. found by taking data points and finding linear line of best fit
   int return_terminal_speed = 6000;
+  double temp1;
+  double temp2;
+  int probetime;
+
   unsigned long lastHeartbeatTime = millis();
   unsigned long stretch_start_time= 0;
   unsigned long stretch_end_time=0;
@@ -449,15 +453,33 @@ lastHeartbeatTime = millis(); //reset heartbeat time since none sent during move
   digitalWrite(DIR_PIN, HIGH); // towards motor
   delay(100);
      tone(PUL_PIN, 2000);//change this to make it go faster
+     probetime = millis();
     while(distanceInInches > ending_measurement){
       //delay(1);
       inputCounts = P1.readAnalog(1, 1); //Reads analog data from slot 1 channel 2 of the analog input module
       inputVolts = 5 * ((float)inputCounts / 65535);  //Convert 13-bit value to Volts
       distanceInInches = inputCounts*19.875/65535.0 +0.1;//manual 0.1 inch offset 
-      Serial.println(distanceInInches, 5); // Print the distance in inches up to 2 decimal places
+      Serial.println(distanceInInches, 5); // Print the distance in inches up to 2 decimal places      
+      if((millis() - probetime) > 100){//subject to change
+        temp2 = distanceInInches;
+        if(temp2 == temp1){
+          noTone(PUL_PIN);
+          delay(2000);
+          cur_speed = 2000;
+
+        }
+        probetime = millis();
+        temp1 = distanceInInches;
+      }
       cur_speed += 1;
       if (cur_speed > stretch_terminal_speed){
         cur_speed = stretch_terminal_speed;
+      }
+      if(distanceInInches < ending_measurement + 0.15){
+        cur_speed = cur_speed - 51;
+        if(cur_speed < 2000){
+          cur_speed = 2000;
+        }
       }
       tone(PUL_PIN,cur_speed);//change this to make it go faster
     }
