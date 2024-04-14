@@ -300,6 +300,9 @@ while(1){
   double distanceInInches;
   double threshold = 0.0000;
   double overshoot = 0.05;
+  double min_absolute_stop = 5.3000;//5.25;  //can't go further than than this with plates
+  double slow_stop_threshold = 0.02; //how far before end to slow down 
+
 
   int stretch_terminal_speed = 1300*stretching_speed; //eq. found by taking data points and finding linear line of best fit
   int return_terminal_speed = 6000;
@@ -319,9 +322,9 @@ while(1){
   int right_switch_value = digitalRead(right_switchPin);// towards motor
 
   lastHeartbeatTime = millis(); //reset heartbeat time since none sent during movement
-  while(left_switch_value != 0){
-    Serial.println("Waiting for left switch");
-      left_switch_value = digitalRead(left_switchPin);
+  while(right_switch_value != 0){
+    Serial.println("Waiting for right switch");
+      right_switch_value = digitalRead(right_switchPin);
       delay(100);
 
       if (client.available()) {
@@ -349,7 +352,7 @@ while(1){
     }
 
       
-  } //wait until left switch pressed
+  } //wait until right switch pressed
 
 //  Serial.print("Left Switch Value: ");
 //  Serial.println(left_switch_value, 2);
@@ -362,10 +365,17 @@ while(1){
 
 //to go to starting position, want to go too far and then come back
      //noTone(PUL_PIN);
-     digitalWrite(DIR_PIN, LOW); // away from motor
+     digitalWrite(DIR_PIN, HIGH); // towards from motor
      delay(100);
      tone(PUL_PIN,cur_speed);//change this to make it go faster
-    while(distanceInInches < (starting_measurement + overshoot)){
+    while(distanceInInches > (starting_measurement - overshoot)){
+        Serial.println("waiting for limit reached");
+      if (distanceInInches <= min_absolute_stop){
+        Serial.println("LIMIT REACHED*****");
+        noTone(PUL_PIN);
+        
+        break;
+      }
 
       
       //delay(1);
@@ -381,13 +391,13 @@ while(1){
     }
 
      noTone(PUL_PIN);
-     digitalWrite(DIR_PIN, HIGH); // towards motor
+     digitalWrite(DIR_PIN, LOW); // away motor
      delay(100);
      cur_speed =2000;
     
     
      
-    while(distanceInInches > (starting_measurement)){
+    while(distanceInInches < (starting_measurement)){
       //delay(1);
       inputCounts = P1.readAnalog(1, 1); //Reads analog data from slot 1 channel 2 of the analog input module
       inputVolts = 5 * ((float)inputCounts / 65535);  //Convert 13-bit value to Volts
@@ -415,9 +425,9 @@ while(1){
    delay(500);
 
 lastHeartbeatTime = millis(); //reset heartbeat time since none sent during movement
-  while(right_switch_value != 0){
-       Serial.println("Waiting for right switch");
-      right_switch_value = digitalRead(right_switchPin);
+  while(left_switch_value != 0){
+//       Serial.println("Waiting for left switch");
+      left_switch_value = digitalRead(left_switchPin);
       delay(100);
       
  if (client.available()) {
@@ -444,21 +454,27 @@ lastHeartbeatTime = millis(); //reset heartbeat time since none sent during move
         return;
     }
        
-  } //wait until right switch pressed
+  } //wait until left switch pressed
 
  
   stretch_start_time = millis();
   
   cur_speed = 2000;
-  digitalWrite(DIR_PIN, HIGH); // towards motor
+  digitalWrite(DIR_PIN, LOW); // away from motor
   delay(100);
      tone(PUL_PIN, 2000);//change this to make it go faster
      probetime = millis();
-    while(distanceInInches > ending_measurement){
+    while(distanceInInches < ending_measurement){
       //delay(1);
       inputCounts = P1.readAnalog(1, 1); //Reads analog data from slot 1 channel 2 of the analog input module
       inputVolts = 5 * ((float)inputCounts / 65535);  //Convert 13-bit value to Volts
       distanceInInches = inputCounts*19.875/65535.0 +0.1;//manual 0.1 inch offset 
+
+      if (distanceInInches <= min_absolute_stop){
+        noTone(PUL_PIN);
+        break;
+      }
+
       Serial.println(distanceInInches, 5); // Print the distance in inches up to 2 decimal places      
       if((millis() - probetime) > 100){//subject to change
         temp2 = distanceInInches;
@@ -475,7 +491,7 @@ lastHeartbeatTime = millis(); //reset heartbeat time since none sent during move
       if (cur_speed > stretch_terminal_speed){
         cur_speed = stretch_terminal_speed;
       }
-      if(distanceInInches < ending_measurement + 0.15){
+      if(distanceInInches > ending_measurement - slow_stop_threshold){
         cur_speed = cur_speed - 51;
         if(cur_speed < 2000){
           cur_speed = 2000;
