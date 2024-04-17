@@ -301,13 +301,14 @@ while(1){
   double threshold = 0.0000;
   double overshoot = 0.05;
   double min_absolute_stop = 5.3000;//5.25;  //can't go further than than this with plates
+  double max_absolute_stop = 14.5;//15.100;
   double slow_stop_threshold = 0.02; //how far before end to slow down 
 
 
   int stretch_terminal_speed = 1300*stretching_speed; //eq. found by taking data points and finding linear line of best fit
   int return_terminal_speed = 1300*6;
-  double temp1;
-  double temp2;
+  double dist1;
+  double dist2;
   int probetime;
 
   unsigned long lastHeartbeatTime = millis();
@@ -368,13 +369,27 @@ while(1){
      digitalWrite(DIR_PIN, HIGH); // towards from motor
      delay(100);
      tone(PUL_PIN,cur_speed);//change this to make it go faster
+
+     probetime = millis();
+     
     while(distanceInInches > (starting_measurement - overshoot)){
-        Serial.println("waiting for limit reached");
+//        Serial.println("waiting for limit reached");
       if (distanceInInches <= min_absolute_stop){
         Serial.println("LIMIT REACHED*****");
         noTone(PUL_PIN);
-        
         break;
+      }
+
+      if((millis() - probetime) > 100){
+        dist2 = distanceInInches;
+        if(dist2 == dist1){
+          noTone(PUL_PIN);
+          delay(2000);
+          cur_speed = 2000;
+
+        }
+        probetime = millis();
+        dist1 = distanceInInches;
       }
 
       
@@ -475,17 +490,23 @@ lastHeartbeatTime = millis(); //reset heartbeat time since none sent during move
         break;
       }
 
+      if (distanceInInches >= max_absolute_stop){
+        Serial.println("LIMIT REACHED*****");
+        noTone(PUL_PIN);
+        break;
+      }
+
       Serial.println(distanceInInches, 5); // Print the distance in inches up to 2 decimal places      
       if((millis() - probetime) > 100){//subject to change
-        temp2 = distanceInInches;
-        if(temp2 == temp1){
+        dist2 = distanceInInches;
+        if(dist2 == dist1){
           noTone(PUL_PIN);
           delay(2000);
           cur_speed = 2000;
 
         }
         probetime = millis();
-        temp1 = distanceInInches;
+        dist1 = distanceInInches;
       }
       cur_speed += 1;
       if (cur_speed > stretch_terminal_speed){
