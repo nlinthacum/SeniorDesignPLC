@@ -305,7 +305,7 @@ while(1){
 
 
   int stretch_terminal_speed = 1300*stretching_speed; //eq. found by taking data points and finding linear line of best fit
-  int return_terminal_speed = 6000;
+  int return_terminal_speed = 1300*6;
   double temp1;
   double temp2;
   int probetime;
