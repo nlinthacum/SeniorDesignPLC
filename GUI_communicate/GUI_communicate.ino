@@ -10,6 +10,7 @@
 
 void SetStartingDistance(EthernetClient client);
 void StretchSeal(double starting_measurement, double ending_measurement, EthernetClient client);
+double ReadDistance();
 
 const float mmToInches = 0.0393701; // Conversion factor
 const char P1_04AD_CONFIG[] = { 0x40, 0x00, 0x00, 0x00, 0x20, 0x02, 0x00, 0x00, 0x21, 0x03, 0x00, 0x00, 0x22, 0x03, 0x00, 0x00, 0x23, 0x03 };
@@ -210,8 +211,7 @@ while(1){
               lastHeartbeatTime = millis();
            }
             if (receivedData == "saved_starting"){
-                inputCounts = P1.readAnalog(1, 1); //Reading 1 more time
-                distanceInInches = inputCounts*19.875/65535.0 +0.1;
+                distanceInInches = ReadDistance();
                 Serial.println("Sending starting position");
                 String str = String(distanceInInches, 6);
                 char msg[10];
@@ -280,9 +280,7 @@ while(1){
     }
     lastHeartbeatTime = millis(); //reset heartbeat time since none sent during movement
   }
- inputCounts = P1.readAnalog(1, 1); //Reads analog data from slot 1 channel 2 of the analog input module
- inputVolts = 5 * ((float)inputCounts / 65535);  //Convert 13-bit value to Volts
- distanceInInches = inputCounts*19.875/65535.0 +0.1;//manual 0.1 inch offset 
+ distanceInInches = ReadDistance();
  Serial.print(distanceInInches, 5); // Print the distance in inches up to 2 decimal places
  Serial.println(" inches");
 
@@ -360,9 +358,7 @@ while(1){
  
    Serial.println("going to starting position");
 
-    inputCounts = P1.readAnalog(1, 1); //Reads analog data from slot 1 channel 2 of the analog input module
-    inputVolts = 5 * ((float)inputCounts / 65535);  //Convert 13-bit value to Volts
-    distanceInInches = inputCounts*19.875/65535.0 +0.1;//manual 0.1 inch offset 
+     distanceInInches = ReadDistance();
 
 //to go to starting position, want to go too far and then come back
      //noTone(PUL_PIN);
@@ -380,7 +376,7 @@ while(1){
         break;
       }
 
-      if((millis() - probetime) > 100){
+      if((millis() - probetime) > 150){
         dist2 = distanceInInches;
         if(dist2 == dist1){
           noTone(PUL_PIN);
@@ -394,9 +390,7 @@ while(1){
 
       
       //delay(1);
-      inputCounts = P1.readAnalog(1, 1); //Reads analog data from slot 1 channel 2 of the analog input module
-      inputVolts = 5 * ((float)inputCounts / 65535);  //Convert 13-bit value to Volts
-      distanceInInches = inputCounts*19.875/65535.0 +0.1;//manual 0.1 inch offset 
+      distanceInInches = ReadDistance();
       Serial.println(distanceInInches, 5); // Print the distance in inches up to 2 decimal places
       cur_speed += 1;
       if (cur_speed > return_terminal_speed){
@@ -414,9 +408,7 @@ while(1){
      
     while(distanceInInches < (starting_measurement)){
       //delay(1);
-      inputCounts = P1.readAnalog(1, 1); //Reads analog data from slot 1 channel 2 of the analog input module
-      inputVolts = 5 * ((float)inputCounts / 65535);  //Convert 13-bit value to Volts
-      distanceInInches = inputCounts*19.875/65535.0 +0.1;//manual 0.1 inch offset 
+       distanceInInches = ReadDistance();
       Serial.println(distanceInInches, 5); // Print the distance in inches up to 2 decimal places
       cur_speed += 1;
        if (cur_speed > return_terminal_speed){
@@ -427,9 +419,7 @@ while(1){
     noTone(PUL_PIN);
 
   //now we are at the starting position
-  inputCounts = P1.readAnalog(1, 1); //Reading 1 more time
-  inputVolts = 5 * ((float)inputCounts / 65535); 
-  distanceInInches = inputCounts*19.875/65535.0 +0.1;
+   distanceInInches = ReadDistance();
   Serial.println("Sending starting position");
 
    String str1 = String(distanceInInches, 6);
@@ -481,9 +471,7 @@ lastHeartbeatTime = millis(); //reset heartbeat time since none sent during move
      probetime = millis();
     while(distanceInInches < ending_measurement){
       //delay(1);
-      inputCounts = P1.readAnalog(1, 1); //Reads analog data from slot 1 channel 2 of the analog input module
-      inputVolts = 5 * ((float)inputCounts / 65535);  //Convert 13-bit value to Volts
-      distanceInInches = inputCounts*19.875/65535.0 +0.1;//manual 0.1 inch offset 
+        distanceInInches = ReadDistance();
 
       if (distanceInInches <= min_absolute_stop){
         noTone(PUL_PIN);
@@ -497,7 +485,7 @@ lastHeartbeatTime = millis(); //reset heartbeat time since none sent during move
       }
 
       Serial.println(distanceInInches, 5); // Print the distance in inches up to 2 decimal places      
-      if((millis() - probetime) > 100){//subject to change
+      if((millis() - probetime) > 150){//subject to change
         dist2 = distanceInInches;
         if(dist2 == dist1){
           noTone(PUL_PIN);
@@ -530,9 +518,7 @@ lastHeartbeatTime = millis(); //reset heartbeat time since none sent during move
   Serial.println(stretch_time_seconds);
 
   delay(500);
-  inputCounts = P1.readAnalog(1, 1); //Reading 1 more time
-  inputVolts = 5 * ((float)inputCounts / 65535); 
-  distanceInInches = inputCounts*19.875/65535.0 +0.1;
+  distanceInInches = ReadDistance();
   Serial.println("Sending ending position");
 
    String dst = String(distanceInInches, 6);
@@ -545,4 +531,11 @@ lastHeartbeatTime = millis(); //reset heartbeat time since none sent during move
 
   
  }
+ }
+
+//reads the distance from the linear distance sensor and returns the value in inches
+double ReadDistance(){
+  int inputCounts = P1.readAnalog(1, 1); 
+  double distanceInInches = inputCounts*19.875/65535.0 +0.1;//+0.1 inch offset
+  return distanceInInches;
  }
